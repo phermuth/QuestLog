@@ -1,0 +1,21 @@
+## Interface: 11200
+
+## Title: QuestLog
+## Notes: Bitácora de misiones con registro de coordenadas y estadísticas
+## Author: Phermuth
+## Version: 1.1
+## SavedVariables: QuestLogDB
+
+## OptionalDeps: Ace2, FuBar, FuBarPlugin-2.0, Deformat, TabletLib, DewdropLib
+
+# Librerías Core
+libs\AceLibrary\AceLibrary.lua
+libs\AceOO-2.0\AceOO-2.0.lua
+libs\AceConsole-2.0\AceConsole-2.0.lua
+libs\AceEvent-2.0\AceEvent-2.0.lua
+libs\AceDB-2.0\AceDB-2.0.lua
+libs\AceAddon-2.0\AceAddon-2.0.lua
+libs\AceHook-2.1\AceHook-2.1.lua
+
+# Archivo principal del addon
+QuestLog.lua
