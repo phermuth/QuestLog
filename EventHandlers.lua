@@ -54,6 +54,23 @@ end
 -- Métodos para manejar eventos - DEBEN coincidir exactamente con los nombres de los eventos
 function QuestLog:QUEST_ACCEPTED()
     -- En Vanilla, QUEST_ACCEPTED no pasa el questIndex como argumento
+    if not self.db.account.questOrder then
+        self.db.account.questOrder = {}
+    end
+    -- Verificar si la misión ya está en el orden
+    local found = false
+    for _, id in ipairs(self.db.account.questOrder) do
+        if id == questID then
+            found = true
+            break
+        end
+    end
+    
+    -- Si no está en el orden, añadirla al principio
+    if not found then
+        table.insert(self.db.account.questOrder, 1, questID)
+    end
+    
     -- Tenemos que obtener el título de la misión del marco de la misión
     local title = GetTitleText()
     if not title then 

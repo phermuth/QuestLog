@@ -4,13 +4,15 @@
 function QuestLog:UpdateQuestList()
     local quests = self:GetQuestList()
     
-    -- Ordenar por timestamp (más recientes primero)
-    table.sort(quests, function(a, b) return (a.timestamp or 0) > (b.timestamp or 0) end)
+    -- Ordenar por timestamp (más recientes primero) si no hay un orden personalizado
+    if not self.db.account.questOrder or not next(self.db.account.questOrder) then
+        table.sort(quests, function(a, b) return (a.timestamp or 0) > (b.timestamp or 0) end)
+    end
     
     local numEntries = table.getn(quests)
     local maxDisplayed = 15
-    
-    -- Simplemente calculamos el offset nosotros mismos
+
+    -- Calculamos el offset nosotros mismos
     local scrollFrame = self.scrollFrame
     local offset = math.floor(scrollFrame:GetVerticalScroll() / 20)
     offset = math.min(offset, math.max(0, numEntries - maxDisplayed))
@@ -29,6 +31,8 @@ function QuestLog:UpdateQuestList()
             
             button.title:SetText(statusColor .. quest.title .. " |r[" .. quest.level .. "]")
             button.questID = quest.questID
+            button.upButton.questID = quest.questID
+            button.downButton.questID = quest.questID
             
             local coordText = ""
             if quest.acceptCoords then
@@ -37,8 +41,12 @@ function QuestLog:UpdateQuestList()
             button.coords:SetText(coordText)
             
             button:Show()
+            button.upButton:Show()
+            button.downButton:Show()
         else
             button:Hide()
+            button.upButton:Hide()
+            button.downButton:Hide()
         end
     end
 end
@@ -320,6 +328,40 @@ function QuestLog:CreateQuestLogFrame()
     self.detailFrame = detailFrame
     self.detailContent = detailContent
     self.selectedQuest = nil
+    
+    -- IMPORTANTE: Crear los botones de movimiento DESPUÉS de asignar self.buttons
+    -- Ahora podemos acceder a self.buttons con seguridad
+    for i = 1, 15 do
+        -- Botón para mover arriba
+        local upButton = CreateFrame("Button", "QuestLogUpButton" .. i, frame)
+        upButton:SetWidth(20)
+        upButton:SetHeight(20)
+        upButton:SetPoint("RIGHT", self.buttons[i], "LEFT", -5, 0)
+        upButton:SetNormalTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Up")
+        upButton:SetPushedTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Down")
+        upButton:SetHighlightTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Highlight")
+        upButton:SetScript("OnClick", function()
+            if this.questID then
+                QuestLog:MoveQuestUp(this.questID)
+            end
+        end)
+        self.buttons[i].upButton = upButton
+        
+        -- Botón para mover abajo
+        local downButton = CreateFrame("Button", "QuestLogDownButton" .. i, frame)
+        downButton:SetWidth(20)
+        downButton:SetHeight(20)
+        downButton:SetPoint("RIGHT", upButton, "LEFT", -2, 0)
+        downButton:SetNormalTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Up")
+        downButton:SetPushedTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Down")
+        downButton:SetHighlightTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Highlight")
+        downButton:SetScript("OnClick", function()
+            if this.questID then
+                QuestLog:MoveQuestDown(this.questID)
+            end
+        end)
+        self.buttons[i].downButton = downButton
+    end
     
     -- Añadir a los frames especiales para cerrar con Escape
     table.insert(UISpecialFrames, "QuestLogFrame")

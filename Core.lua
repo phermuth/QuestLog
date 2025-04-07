@@ -11,6 +11,7 @@ QuestLog.lastPlayerLevel = 0
 local defaults = {
     quests = {}, -- Lista de todas las misiones (ahora indexadas por ID único)
     questsByTitle = {}, -- Índice secundario para buscar misiones por título
+    questOrder = {}, -- Nueva estructura para almacenar el orden personalizado de las misiones
 }
 
 -- Colores para los diferentes estados de las misiones
@@ -176,11 +177,39 @@ function QuestLog:OnDisable()
 end
 
 -- Devuelve una lista plana de todas las misiones
+-- GetQuestList modificada para respetar el orden personalizado
 function QuestLog:GetQuestList()
     local list = {}
-    for _, quest in pairs(self.db.account.quests) do
-        table.insert(list, quest)
+    
+    -- Si existe un orden personalizado, lo usamos
+    if self.db.account.questOrder and next(self.db.account.questOrder) then
+        -- Primero agregamos las misiones en el orden personalizado
+        for _, questID in ipairs(self.db.account.questOrder) do
+            if self.db.account.quests[questID] then
+                table.insert(list, self.db.account.quests[questID])
+            end
+        end
+        
+        -- Luego agregamos cualquier misión que no esté en el orden personalizado
+        for questID, quest in pairs(self.db.account.quests) do
+            local found = false
+            for _, orderedID in ipairs(self.db.account.questOrder) do
+                if orderedID == questID then
+                    found = true
+                    break
+                end
+            end
+            if not found then
+                table.insert(list, quest)
+            end
+        end
+    else
+        -- Si no hay orden personalizado, solo agregamos todas las misiones
+        for _, quest in pairs(self.db.account.quests) do
+            table.insert(list, quest)
+        end
     end
+    
     return list
 end
 
@@ -206,4 +235,86 @@ function QuestLog:FormatTime(seconds)
     else
         return string.format("%d segundos", seconds)
     end
+end
+
+-- Nueva función para mover una misión hacia arriba en la lista ordenada
+function QuestLog:MoveQuestUp(questID)
+    if not self.db.account.questOrder then
+        self.db.account.questOrder = {}
+        -- Inicializar el orden con el orden actual basado en timestamp
+        local quests = {}
+        for id, quest in pairs(self.db.account.quests) do
+            table.insert(quests, {id = id, timestamp = quest.timestamp or 0})
+        end
+        table.sort(quests, function(a, b) return (a.timestamp or 0) > (b.timestamp or 0) end)
+        for _, quest in ipairs(quests) do
+            table.insert(self.db.account.questOrder, quest.id)
+        end
+    end
+    
+    -- Encontrar el índice actual de la misión
+    local currentIndex = 0
+    for i, id in ipairs(self.db.account.questOrder) do
+        if id == questID then
+            currentIndex = i
+            break
+        end
+    end
+    
+    -- Si no está en la lista ordenada o ya está en la parte superior, añadirla
+    if currentIndex <= 1 then
+        if currentIndex == 0 then
+            table.insert(self.db.account.questOrder, 1, questID)
+        end
+        return
+    end
+    
+    -- Intercambiar con la misión anterior
+    local tempID = self.db.account.questOrder[currentIndex-1]
+    self.db.account.questOrder[currentIndex-1] = questID
+    self.db.account.questOrder[currentIndex] = tempID
+    
+    -- Actualizar la UI
+    self:UpdateQuestList()
+end
+
+-- Nueva función para mover una misión hacia abajo en la lista ordenada
+function QuestLog:MoveQuestDown(questID)
+    if not self.db.account.questOrder then
+        self.db.account.questOrder = {}
+        -- Inicializar el orden con el orden actual basado en timestamp
+        local quests = {}
+        for id, quest in pairs(self.db.account.quests) do
+            table.insert(quests, {id = id, timestamp = quest.timestamp or 0})
+        end
+        table.sort(quests, function(a, b) return (a.timestamp or 0) > (b.timestamp or 0) end)
+        for _, quest in ipairs(quests) do
+            table.insert(self.db.account.questOrder, quest.id)
+        end
+    end
+    
+    -- Encontrar el índice actual de la misión
+    local currentIndex = 0
+    for i, id in ipairs(self.db.account.questOrder) do
+        if id == questID then
+            currentIndex = i
+            break
+        end
+    end
+    
+    -- Si no está en la lista ordenada o ya está en la parte inferior, añadirla al final
+    if currentIndex == 0 then
+        table.insert(self.db.account.questOrder, questID)
+        return
+    elseif currentIndex == table.getn(self.db.account.questOrder) then
+        return
+    end
+    
+    -- Intercambiar con la misión siguiente
+    local tempID = self.db.account.questOrder[currentIndex+1]
+    self.db.account.questOrder[currentIndex+1] = questID
+    self.db.account.questOrder[currentIndex] = tempID
+    
+    -- Actualizar la UI
+    self:UpdateQuestList()
 end
