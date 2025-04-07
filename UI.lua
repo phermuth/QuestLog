@@ -1,6 +1,7 @@
 -- UI.lua
 -- Funciones de la interfaz de usuario para QuestLog
 
+-- Reemplaza la función UpdateQuestList en UI.lua con esta versión mejorada
 function QuestLog:UpdateQuestList()
     local quests = self:GetQuestList()
     
@@ -11,19 +12,39 @@ function QuestLog:UpdateQuestList()
     
     local numEntries = table.getn(quests)
     local maxDisplayed = 15
-
-    -- Calculamos el offset nosotros mismos
-    local scrollFrame = self.scrollFrame
-    local offset = math.floor(scrollFrame:GetVerticalScroll() / 20)
-    offset = math.min(offset, math.max(0, numEntries - maxDisplayed))
     
-    -- Asegurarse de que el scroll está en un punto válido
-    scrollFrame:SetVerticalScroll(offset * 20)
+    -- Asegurarnos de que el scrollPos esté en un rango válido
+    if not self.scrollPos then
+        self.scrollPos = 0
+    end
+    
+    -- Limitar el rango de desplazamiento
+    local maxScroll = math.max(0, numEntries - maxDisplayed)
+    if self.scrollPos > maxScroll then
+        self.scrollPos = maxScroll
+    end
+    
+    -- Actualizar los botones de scroll
+    if self.scrollUpButton then
+        if self.scrollPos > 0 then
+            self.scrollUpButton:Enable()
+        else
+            self.scrollUpButton:Disable()
+        end
+    end
+    
+    if self.scrollDownButton then
+        if self.scrollPos < maxScroll then
+            self.scrollDownButton:Enable()
+        else
+            self.scrollDownButton:Disable()
+        end
+    end
     
     -- Actualizar cada botón
     for i = 1, maxDisplayed do
         local button = self.buttons[i]
-        local index = i + offset
+        local index = i + self.scrollPos
         
         if index <= numEntries then
             local quest = quests[index]
@@ -50,6 +71,49 @@ function QuestLog:UpdateQuestList()
         end
     end
 end
+
+-- Función para desplazarse hacia abajo
+function QuestLog:ScrollDown()
+    local quests = self:GetQuestList()
+    local numEntries = table.getn(quests)
+    local maxDisplayed = 15
+    local maxScroll = math.max(0, numEntries - maxDisplayed)
+    
+    if not self.scrollPos then
+        self.scrollPos = 0
+    end
+    
+    if self.scrollPos < maxScroll then
+        self.scrollPos = self.scrollPos + 1
+        self:UpdateQuestList()
+    end
+end
+
+-- Función para desplazarse una página hacia arriba
+function QuestLog:ScrollPageUp()
+    if not self.scrollPos then
+        self.scrollPos = 0
+    end
+    
+    self.scrollPos = math.max(0, self.scrollPos - 10)
+    self:UpdateQuestList()
+end
+
+-- Función para desplazarse una página hacia abajo
+function QuestLog:ScrollPageDown()
+    local quests = self:GetQuestList()
+    local numEntries = table.getn(quests)
+    local maxDisplayed = 15
+    local maxScroll = math.max(0, numEntries - maxDisplayed)
+    
+    if not self.scrollPos then
+        self.scrollPos = 0
+    end
+    
+    self.scrollPos = math.min(maxScroll, self.scrollPos + 10)
+    self:UpdateQuestList()
+end
+
 
 function QuestLog:ShowQuestStats()
     local quests = self:GetQuestList()
@@ -202,6 +266,7 @@ function QuestLog:ShowStatsDialog(statsText)
 end
 
 -- Funciones para la interfaz de usuario
+-- Reemplaza la función CreateQuestLogFrame con esta versión personalizada
 function QuestLog:CreateQuestLogFrame()
     -- Crear frame principal
     local frame = CreateFrame("Frame", "QuestLogFrame", UIParent)
@@ -241,22 +306,35 @@ function QuestLog:CreateQuestLogFrame()
     statsButton:SetText("Estadísticas")
     statsButton:SetScript("OnClick", function() QuestLog:ShowQuestStats() end)
     
-    -- Crear ScrollFrame para la lista de misiones
-    local scrollFrame = CreateFrame("ScrollFrame", "QuestLogScrollFrame", frame, "FauxScrollFrameTemplate")
-    scrollFrame:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -40)
-    scrollFrame:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -40, 40)
-    scrollFrame.itemHeight = 20 -- Añade esta línea
-    scrollFrame:SetScript("OnVerticalScroll", function(self, offset)
-        FauxScrollFrame_OnVerticalScroll(self, offset, 20, function() QuestLog:UpdateQuestList() end)
-    end)
+    -- Área para la lista de misiones (que reemplaza al ScrollFrame)
+    local listArea = CreateFrame("Frame", "QuestLogListArea", frame)
+    listArea:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -40)
+    listArea:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -40, 40)
+    
+    -- Botón de desplazamiento hacia arriba
+    local scrollUpButton = CreateFrame("Button", "QuestLogScrollUpButton", frame, "UIPanelScrollUpButtonTemplate")
+    scrollUpButton:SetPoint("TOPRIGHT", listArea, "TOPRIGHT", 0, 5)
+    scrollUpButton:SetScript("OnClick", function() QuestLog:ScrollUp() end)
+    
+    -- Botón de desplazamiento hacia abajo
+    local scrollDownButton = CreateFrame("Button", "QuestLogScrollDownButton", frame, "UIPanelScrollDownButtonTemplate")
+    scrollDownButton:SetPoint("BOTTOMRIGHT", listArea, "BOTTOMRIGHT", 0, -5)
+    scrollDownButton:SetScript("OnClick", function() QuestLog:ScrollDown() end)
+    
+    -- Guardar referencias a los botones de desplazamiento
+    self.scrollUpButton = scrollUpButton
+    self.scrollDownButton = scrollDownButton
+    
+    -- Inicializar el desplazamiento
+    self.scrollPos = 0
     
     -- Crear botones para cada entrada de la lista
     local buttons = {}
     for i = 1, 15 do
-        local button = CreateFrame("Button", "QuestLogButton" .. i, frame)
+        local button = CreateFrame("Button", "QuestLogButton" .. i, listArea)
         button:SetWidth(440)
         button:SetHeight(20)
-        button:SetPoint("TOPLEFT", scrollFrame, "TOPLEFT", 5, -((i-1) * 20))
+        button:SetPoint("TOPLEFT", listArea, "TOPLEFT", 5, -((i-1) * 20))
         
         button:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
         
@@ -279,6 +357,16 @@ function QuestLog:CreateQuestLogFrame()
         
         buttons[i] = button
     end
+    
+    -- Responder a eventos del mouse wheel para scroll
+    listArea:EnableMouseWheel(true)
+    listArea:SetScript("OnMouseWheel", function()
+        if arg1 > 0 then
+            QuestLog:ScrollUp()
+        else
+            QuestLog:ScrollDown()
+        end
+    end)
     
     -- Panel de detalles
     local detailFrame = CreateFrame("Frame", "QuestLogDetailFrame", frame)
@@ -323,14 +411,13 @@ function QuestLog:CreateQuestLogFrame()
     
     -- Guardar referencias
     self.frame = frame
-    self.scrollFrame = scrollFrame
+    self.listArea = listArea
     self.buttons = buttons
     self.detailFrame = detailFrame
     self.detailContent = detailContent
     self.selectedQuest = nil
     
     -- IMPORTANTE: Crear los botones de movimiento DESPUÉS de asignar self.buttons
-    -- Ahora podemos acceder a self.buttons con seguridad
     for i = 1, 15 do
         -- Botón para mover arriba
         local upButton = CreateFrame("Button", "QuestLogUpButton" .. i, frame)
@@ -366,4 +453,16 @@ function QuestLog:CreateQuestLogFrame()
     -- Añadir a los frames especiales para cerrar con Escape
     table.insert(UISpecialFrames, "QuestLogFrame")
     table.insert(UISpecialFrames, "QuestLogDetailFrame")
+    
+    -- Agregar soporte para teclas de página arriba/abajo
+    frame:SetScript("OnKeyDown", function()
+        if arg1 == "PAGEUP" then
+            QuestLog:ScrollPageUp()
+        elseif arg1 == "PAGEDOWN" then
+            QuestLog:ScrollPageDown()
+        end
+    end)
+    
+    -- Actualizar la lista de misiones al inicio
+    self:UpdateQuestList()
 end
