@@ -1,5 +1,6 @@
 # QuestLog - Bitácora de Misiones para WoW 1.12
 
+-Phermuth
 QuestLog es un addon para World of Warcraft versión 1.12 (vanilla) que te permite mantener un registro detallado de todas las misiones que aceptas, completadas o abandonadas, junto con las coordenadas donde las aceptaste y entregaste.
 
 ## Características
