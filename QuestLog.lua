@@ -2,6 +2,11 @@
 -- Addon para registrar las misiones completadas y sus coordenadas
 
 QuestLog = AceLibrary("AceAddon-2.0"):new("AceConsole-2.0", "AceDB-2.0", "AceEvent-2.0", "AceHook-2.1")
+-- Mejora de la captura de XP para QuestLog en WoW Vanilla 1.12
+
+-- Variables globales para seguimiento de XP
+QuestLog.lastQuestXP = 0
+QuestLog.lastPlayerLevel = 0
 
 -- Inicialización de variables
 local defaults = {
@@ -99,6 +104,34 @@ function QuestLog:OnInitialize()
     self:Print("QuestLog inicializado. DB contiene datos: " .. (next(self.db.account.quests) and "Sí" or "No"))
 end
 
+function QuestLog:CaptureQuestXP()
+    -- Intentar capturar la XP de la misión de múltiples formas
+    local currentLevel = UnitLevel("player")
+    local currentXP = UnitXP("player")
+    local xpToNextLevel = UnitXPMax("player")
+    
+    local xpGained = 0
+    
+    -- Método 1: Si cambia el nivel
+    if currentLevel > self.lastPlayerLevel then
+        -- Calcular XP basada en el cambio de nivel
+        xpGained = xpToNextLevel - (self.lastQuestXP or 0) + currentXP
+        self:Print(string.format("Subiste de nivel. XP calculada: %d", xpGained))
+    else
+        -- Método 2: Comparación directa de XP
+        if currentXP > (self.lastQuestXP or 0) then
+            xpGained = currentXP - (self.lastQuestXP or 0)
+            self:Print(string.format("XP ganada directamente: %d", xpGained))
+        end
+    end
+    
+    -- Actualizar seguimiento de XP
+    self.lastQuestXP = currentXP
+    self.lastPlayerLevel = currentLevel
+    
+    return xpGained
+end
+
 -- Migra los datos del formato antiguo (indexado por título) al nuevo (indexado por ID único)
 function QuestLog:MigrateOldData()
     local hasOldData = false
@@ -145,26 +178,21 @@ function QuestLog:MigrateOldData()
     end
 end
 
+-- En el método OnEnable, asegurarse de inicializar las variables de XP
 function QuestLog:OnEnable()
-    -- Registrar eventos usando su nombre exacto
+    -- Código original de OnEnable
     self:RegisterEvent("QUEST_ACCEPTED")
     self:RegisterEvent("QUEST_COMPLETE")
     self:RegisterEvent("QUEST_FINISHED")
     self:RegisterEvent("QUEST_LOG_UPDATE")
     
-    -- Hook de funciones del juego
-    -- Nos aseguramos de que estas funciones existan
+    -- Hooks originales
     self:Hook("AcceptQuest", true)
     self:Hook("CompleteQuest", true)
     
-    -- Inicializar el seguimiento de misiones
-    for i=1, GetNumQuestLogEntries() do
-        local title, _, _, isHeader = GetQuestLogTitle(i)
-        if not isHeader and title then
-            -- Solo añadimos a nuestro registro de misiones actuales
-            currentQuestLog[title] = true
-        end
-    end
+    -- Inicializar seguimiento de XP
+    self.lastQuestXP = UnitXP("player")
+    self.lastPlayerLevel = UnitLevel("player")
     
     -- Mensaje de inicialización
     self:Print("QuestLog cargado. Usa /qlog para mostrar la bitácora de misiones.")
@@ -250,23 +278,26 @@ function QuestLog:QUEST_ACCEPTED()
 end
 
 function QuestLog:QUEST_COMPLETE()
-    -- Este evento se dispara cuando se muestra la ventana de completar misión
-    -- Guardamos el título para usarlo cuando se entregue realmente
+    -- Este método se llama cuando se muestra la ventana de misión completada
     local title = GetTitleText()
     if not title then
         self:Print("Error: No se pudo obtener el título de la misión completada")
         return
     end
     
+    -- Capturar XP antes de entregar la misión
+    self.lastQuestXP = UnitXP("player")
+    self.xpBeforeTurnIn = self.lastQuestXP
+    
     self.lastCompletedQuest = title
     self:Print("Misión lista para entregar: " .. title)
 end
 
+-- Modificaciones para mejorar la captura de experiencia en QuestLog
+
 function QuestLog:QUEST_FINISHED()
-    -- Este evento se dispara cuando se cierra la ventana de misión después de entregarla
     local title = self.lastCompletedQuest
     if not title then 
-        -- Si no tenemos título guardado, intentamos obtenerlo de otra manera
         title = self.questTitle
     end
     
@@ -281,38 +312,23 @@ function QuestLog:QUEST_FINISHED()
     y = math.floor(y * 10000) / 100
     local zone = GetZoneText()
     
-    -- Guardar XP después de la entrega de la misión (lo hemos capturado en CompleteQuest)
-    local currentXP = UnitXP("player")
-    self:Print("XP después de entregar: " .. currentXP)
+    -- Intentar capturar la XP de la misión
+    local xpGained = self:CaptureQuestXP()
     
-    local xpGained = 0
-    if self.xpBeforeTurnIn and currentXP > self.xpBeforeTurnIn then
-        xpGained = currentXP - self.xpBeforeTurnIn
-        self:Print("¡Experiencia calculada correctamente! Ganancia: " .. xpGained .. " XP")
-    elseif self.xpBeforeTurnIn then
-        -- Si la XP nueva es menor que la anterior, podría ser porque subiste de nivel
-        self:Print("XP nueva menor que anterior. Posible subida de nivel o problema en el cálculo.")
-        -- En caso de subida de nivel, podríamos intentar calcular la XP considerando el máximo del nivel anterior
-        -- Pero por ahora, lo dejamos como 0 para evitar valores incorrectos
-        xpGained = 0
-    else
-        self:Print("No se pudo calcular la XP ganada. No se guardó el valor previo.")
-        xpGained = 0
-    end
+    -- Obtener el nivel actual del jugador
+    local playerLevel = UnitLevel("player")
     
     -- Buscar si tenemos esta misión en nuestra base de datos
     local found = false
     if self.db.account.questsByTitle[title] then
-        -- Buscar entre las misiones con este título
         for _, questID in ipairs(self.db.account.questsByTitle[title]) do
             local quest = self.db.account.quests[questID]
             if quest and quest.status == "accepted" then
-                -- Actualizar la misión existente
                 quest.turnInCoords = { x = x, y = y, zone = zone }
                 quest.status = "completed"
                 quest.completedTimestamp = time()
                 quest.completionTime = quest.completedTimestamp - quest.timestamp
-                quest.completionLevel = UnitLevel("player")
+                quest.completionLevel = playerLevel
                 quest.xpGained = xpGained
                 
                 self:Print("Misión completada: " .. title .. " en " .. zone .. " (" .. x .. ", " .. y .. ")")
@@ -320,7 +336,7 @@ function QuestLog:QUEST_FINISHED()
                 if xpGained > 0 then
                     self:Print("Experiencia ganada: " .. xpGained .. " XP")
                 else
-                    self:Print("No se registró ganancia de XP para esta misión.")
+                    self:Print("No se pudo calcular la ganancia de XP para esta misión.")
                 end
                 
                 found = true
@@ -336,15 +352,15 @@ function QuestLog:QUEST_FINISHED()
         self.db.account.quests[questID] = {
             questID = questID,
             title = title,
-            level = UnitLevel("player"), -- Usamos el nivel del jugador como aproximación
-            acceptCoords = nil, -- No sabemos dónde la aceptó
+            level = playerLevel,
+            acceptCoords = nil,
             turnInCoords = { x = x, y = y, zone = zone },
             status = "completed",
             timestamp = time(),
             completedTimestamp = time(),
-            completionTime = 0, -- No sabemos cuánto tiempo llevó
-            playerLevel = UnitLevel("player"),
-            completionLevel = UnitLevel("player"),
+            completionTime = 0,
+            playerLevel = playerLevel,
+            completionLevel = playerLevel,
             xpGained = xpGained,
         }
         
@@ -356,11 +372,11 @@ function QuestLog:QUEST_FINISHED()
         if xpGained > 0 then
             self:Print("Experiencia ganada: " .. xpGained .. " XP")
         else
-            self:Print("No se registró ganancia de XP para esta misión.")
+            self:Print("No se pudo calcular la ganancia de XP para esta misión.")
         end
     end
     
-    -- Limpiar las variables
+    -- Limpiar variables
     self.lastCompletedQuest = nil
     self.questTitle = nil
     self.xpBeforeTurnIn = nil
