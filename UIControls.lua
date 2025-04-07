@@ -102,41 +102,41 @@ function QuestLog:SelectQuest(questID)
         abandoned = "Abandonada"
     }
     
-    local text = colors.header .. "Misión: |r" .. quest.title .. "\n\n"
-    text = text .. colors.header .. "Nivel: |r" .. quest.level .. "\n"
-    text = text .. colors.header .. "Estado: |r" .. (statusText[quest.status] or "Desconocido") .. "\n"
+    local text = self.colors.header .. "Misión: |r" .. quest.title .. "\n\n"
+    text = text .. self.colors.header .. "Nivel: |r" .. quest.level .. "\n"
+    text = text .. self.colors.header .. "Estado: |r" .. (statusText[quest.status] or "Desconocido") .. "\n"
     
     -- Mostrar nivel del jugador al aceptar y completar
     if quest.playerLevel then
-        text = text .. colors.header .. "Nivel al aceptar: |r" .. quest.playerLevel .. "\n"
+        text = text .. self.colors.header .. "Nivel al aceptar: |r" .. quest.playerLevel .. "\n"
     end
     if quest.completionLevel then
-        text = text .. colors.header .. "Nivel al completar: |r" .. quest.completionLevel .. "\n"
+        text = text .. self.colors.header .. "Nivel al completar: |r" .. quest.completionLevel .. "\n"
     end
     
     -- Mostrar XP ganada si está disponible
     if quest.xpGained and quest.xpGained > 0 then
-        text = text .. colors.header .. "Experiencia ganada: |r" .. quest.xpGained .. " XP\n"
+        text = text .. self.colors.header .. "Experiencia ganada: |r" .. quest.xpGained .. " XP\n"
     end
     
     text = text .. "\n"
     
     if quest.acceptCoords then
-        text = text .. colors.header .. "Aceptada en: |r" .. quest.acceptCoords.zone .. "\n"
+        text = text .. self.colors.header .. "Aceptada en: |r" .. quest.acceptCoords.zone .. "\n"
         text = text .. "Coordenadas: (" .. quest.acceptCoords.x .. ", " .. quest.acceptCoords.y .. ")\n\n"
     end
     
     if quest.turnInCoords then
-        text = text .. colors.header .. "Entregada en: |r" .. quest.turnInCoords.zone .. "\n"
+        text = text .. self.colors.header .. "Entregada en: |r" .. quest.turnInCoords.zone .. "\n"
         text = text .. "Coordenadas: (" .. quest.turnInCoords.x .. ", " .. quest.turnInCoords.y .. ")\n\n"
     end
     
     if quest.completionTime and quest.completionTime > 0 then
-        text = text .. colors.header .. "Tiempo de completado: |r" .. self:FormatTime(quest.completionTime) .. "\n\n"
+        text = text .. self.colors.header .. "Tiempo de completado: |r" .. self:FormatTime(quest.completionTime) .. "\n\n"
     end
     
     if quest.manualCoords and table.getn(quest.manualCoords) > 0 then
-        text = text .. colors.header .. "Coordenadas manuales:\n|r"
+        text = text .. self.colors.header .. "Coordenadas manuales:\n|r"
         for i, coord in ipairs(quest.manualCoords) do
             text = text .. i .. ". " .. coord.zone .. " (" .. coord.x .. ", " .. coord.y .. ")\n"
         end

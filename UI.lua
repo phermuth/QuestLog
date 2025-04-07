@@ -10,9 +10,13 @@ function QuestLog:UpdateQuestList()
     local numEntries = table.getn(quests)
     local maxDisplayed = 15
     
-    -- Configurar el scroll frame
-    FauxScrollFrame_Update(self.scrollFrame, numEntries, maxDisplayed, 20)
-    local offset = FauxScrollFrame_GetOffset(self.scrollFrame)
+    -- Simplemente calculamos el offset nosotros mismos
+    local scrollFrame = self.scrollFrame
+    local offset = math.floor(scrollFrame:GetVerticalScroll() / 20)
+    offset = math.min(offset, math.max(0, numEntries - maxDisplayed))
+    
+    -- Asegurarse de que el scroll está en un punto válido
+    scrollFrame:SetVerticalScroll(offset * 20)
     
     -- Actualizar cada botón
     for i = 1, maxDisplayed do
@@ -21,7 +25,7 @@ function QuestLog:UpdateQuestList()
         
         if index <= numEntries then
             local quest = quests[index]
-            local statusColor = colors[quest.status] or colors.accepted
+            local statusColor = self.colors[quest.status] or self.colors.accepted
             
             button.title:SetText(statusColor .. quest.title .. " |r[" .. quest.level .. "]")
             button.questID = quest.questID
@@ -233,6 +237,7 @@ function QuestLog:CreateQuestLogFrame()
     local scrollFrame = CreateFrame("ScrollFrame", "QuestLogScrollFrame", frame, "FauxScrollFrameTemplate")
     scrollFrame:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -40)
     scrollFrame:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -40, 40)
+    scrollFrame.itemHeight = 20 -- Añade esta línea
     scrollFrame:SetScript("OnVerticalScroll", function(self, offset)
         FauxScrollFrame_OnVerticalScroll(self, offset, 20, function() QuestLog:UpdateQuestList() end)
     end)

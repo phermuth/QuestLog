@@ -78,7 +78,7 @@ function QuestLog:QUEST_ACCEPTED()
     local zone = GetZoneText()
     
     -- Generar un ID único para esta misión
-    local questID = GenerateQuestID(title, zone, time())
+    local questID = self:GenerateQuestID(title, zone, time())
     
     -- Añadir la misión a la lista
     self.db.account.quests[questID] = {
@@ -170,7 +170,7 @@ function QuestLog:QUEST_FINISHED()
     
     if not found then
         -- Si no encontramos la misión en nuestro registro, la añadimos como nueva
-        local questID = GenerateQuestID(title, zone, time())
+        local questID = self:GenerateQuestID(title, zone, time())
         
         self.db.account.quests[questID] = {
             questID = questID,
@@ -219,7 +219,7 @@ function QuestLog:QUEST_LOG_UPDATE()
     end
     
     -- Buscar misiones que estaban en el log pero ya no están (posiblemente abandonadas)
-    for title in pairs(currentQuestLog) do
+    for title in pairs(self.currentQuestLog) do
         if not newQuestLog[title] and self.db.account.questsByTitle[title] then
             -- Buscar entre las misiones con este título
             for _, questID in ipairs(self.db.account.questsByTitle[title]) do
@@ -236,5 +236,5 @@ function QuestLog:QUEST_LOG_UPDATE()
     end
     
     -- Actualizar nuestro registro del log
-    currentQuestLog = newQuestLog
+    self.currentQuestLog = newQuestLog
 end

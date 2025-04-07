@@ -14,7 +14,7 @@ local defaults = {
 }
 
 -- Colores para los diferentes estados de las misiones
-local colors = {
+QuestLog.colors = {
     accepted = "|cFFFFFFFF", -- Blanco
     completed = "|cFF00FF00", -- Verde
     abandoned = "|cFFFF0000", -- Rojo
@@ -22,10 +22,10 @@ local colors = {
 }
 
 -- Llevar un seguimiento de las misiones en el log para detectar abandonos
-local currentQuestLog = {}
+QuestLog.currentQuestLog = {}
 
 -- Función para generar ID único para una misión
-local function GenerateQuestID(title, zone, timestamp)
+function QuestLog:GenerateQuestID(title, zone, timestamp)
     local realm = GetRealmName() or "Unknown"
     local player = UnitName("player") or "Unknown"
     return title .. "-" .. realm .. "-" .. player .. "-" .. zone .. "-" .. timestamp
@@ -127,7 +127,7 @@ function QuestLog:MigrateOldData()
                 local zone = (questData.acceptCoords and questData.acceptCoords.zone) or 
                              (questData.turnInCoords and questData.turnInCoords.zone) or "Unknown"
                 local timestamp = questData.timestamp or time()
-                local questID = GenerateQuestID(title, zone, timestamp)
+                local questID = self:GenerateQuestID(title, zone, timestamp)
                 
                 -- Añadir el ID a los datos
                 questData.questID = questID
