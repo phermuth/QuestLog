@@ -72,6 +72,19 @@ function QuestLog:UpdateQuestList()
     end
 end
 
+
+-- Función para desplazarse hacia arriba
+function QuestLog:ScrollUp()
+    if not self.scrollPos then
+        self.scrollPos = 0
+    end
+    
+    if self.scrollPos > 0 then
+        self.scrollPos = self.scrollPos - 1
+        self:UpdateQuestList()
+    end
+end
+
 -- Función para desplazarse hacia abajo
 function QuestLog:ScrollDown()
     local quests = self:GetQuestList()
@@ -360,12 +373,18 @@ function QuestLog:CreateQuestLogFrame()
     
     -- Responder a eventos del mouse wheel para scroll
     listArea:EnableMouseWheel(true)
-    listArea:SetScript("OnMouseWheel", function()
+    -- Crear función de manejo de rueda para el addon
+    function QuestLog:OnMouseWheel()
         if arg1 > 0 then
-            QuestLog:ScrollUp()
+            self:ScrollUp()
         else
-            QuestLog:ScrollDown()
+            self:ScrollDown()
         end
+    end
+
+    -- Asignar el evento al listArea
+    listArea:SetScript("OnMouseWheel", function() 
+        QuestLog:OnMouseWheel() 
     end)
     
     -- Panel de detalles
