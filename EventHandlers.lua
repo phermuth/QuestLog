@@ -57,19 +57,6 @@ function QuestLog:QUEST_ACCEPTED()
     if not self.db.account.questOrder then
         self.db.account.questOrder = {}
     end
-    -- Verificar si la misión ya está en el orden
-    local found = false
-    for _, id in ipairs(self.db.account.questOrder) do
-        if id == questID then
-            found = true
-            break
-        end
-    end
-    
-    -- Si no está en el orden, añadirla al principio
-    if not found then
-        table.insert(self.db.account.questOrder, 1, questID)
-    end
     
     -- Tenemos que obtener el título de la misión del marco de la misión
     local title = GetTitleText()
@@ -113,6 +100,9 @@ function QuestLog:QUEST_ACCEPTED()
     self.db.account.questsByTitle[title] = self.db.account.questsByTitle[title] or {}
     table.insert(self.db.account.questsByTitle[title], questID)
     
+    -- IMPORTANTE: Poner la nueva misión al principio del orden personalizado
+    table.insert(self.db.account.questOrder, 1, questID)
+    
     self:Print("Misión registrada: " .. title .. " en " .. zone .. " (" .. x .. ", " .. y .. ")")
     
     -- Actualizar la UI
@@ -130,6 +120,13 @@ function QuestLog:QUEST_COMPLETE()
     -- Capturar XP antes de entregar la misión
     self.lastQuestXP = UnitXP("player")
     self.xpBeforeTurnIn = self.lastQuestXP
+    
+    -- Obtener coordenadas actuales en la entrega (IMPORTANTE: agregado nuevo)
+    local x, y = GetPlayerMapPosition("player")
+    x = math.floor(x * 10000) / 100
+    y = math.floor(y * 10000) / 100
+    local zone = GetZoneText()
+    self.lastTurnInCoords = { x = x, y = y, zone = zone }
     
     self.lastCompletedQuest = title
     self:Print("Misión lista para entregar: " .. title)
@@ -149,11 +146,19 @@ function QuestLog:QUEST_FINISHED()
         return
     end
     
-    -- Obtener coordenadas actuales
-    local x, y = GetPlayerMapPosition("player")
-    x = math.floor(x * 10000) / 100
-    y = math.floor(y * 10000) / 100
-    local zone = GetZoneText()
+    -- Obtener coordenadas, preferentemente las que guardamos en QUEST_COMPLETE
+    local coords = self.lastTurnInCoords
+    local x, y, zone
+    
+    if coords then
+        x, y, zone = coords.x, coords.y, coords.zone
+    else
+        -- Fallback al método actual
+        x, y = GetPlayerMapPosition("player")
+        x = math.floor(x * 10000) / 100
+        y = math.floor(y * 10000) / 100
+        zone = GetZoneText()
+    end
     
     -- Intentar capturar la XP de la misión
     local xpGained = self:CaptureQuestXP()
@@ -175,6 +180,10 @@ function QuestLog:QUEST_FINISHED()
                 quest.completionLevel = self.completionPlayerLevel or playerLevel
                 quest.turnInLevel = playerLevel
                 quest.xpGained = xpGained
+                
+                -- Mover esta misión al principio del orden personalizado
+                -- para mantener las misiones recién completadas fácilmente accesibles
+                self:MoveQuestToTop(questID)
                 
                 self:Print("Misión completada: " .. title .. " en " .. zone .. " (" .. x .. ", " .. y .. ")")
                 self:Print("Tiempo de completado: " .. self:FormatTime(quest.completionTime))
@@ -214,6 +223,11 @@ function QuestLog:QUEST_FINISHED()
         self.db.account.questsByTitle[title] = self.db.account.questsByTitle[title] or {}
         table.insert(self.db.account.questsByTitle[title], questID)
         
+        -- Añadir al orden personalizado al principio
+        if self.db.account.questOrder then
+            table.insert(self.db.account.questOrder, 1, questID)
+        end
+        
         self:Print("Misión registrada y completada: " .. title)
         if xpGained > 0 then
             self:Print("Experiencia ganada: " .. xpGained .. " XP")
@@ -227,6 +241,7 @@ function QuestLog:QUEST_FINISHED()
     self.questTitle = nil
     self.xpBeforeTurnIn = nil
     self.completionPlayerLevel = nil
+    self.lastTurnInCoords = nil
     
     -- Actualizar la UI
     self:UpdateQuestList()
@@ -235,10 +250,56 @@ end
 function QuestLog:QUEST_LOG_UPDATE()
     -- Obtener todas las misiones actuales
     local newQuestLog = {}
+    local currentQuests = {}
+    
     for i=1, GetNumQuestLogEntries() do
-        local title, _, _, isHeader = GetQuestLogTitle(i)
+        local title, _, _, isHeader, isCollapsed, isComplete = GetQuestLogTitle(i)
         if not isHeader and title then
             newQuestLog[title] = true
+            
+            -- Almacenar el estado actual de la misión para comprobar si se ha completado
+            currentQuests[title] = {
+                isComplete = isComplete,
+                index = i
+            }
+        end
+    end
+    
+    -- Comprobar misiones que han cambiado su estado a "objetivos completados"
+    for title, info in pairs(currentQuests) do
+        if info.isComplete == 1 then -- 1 = objetivos completados
+            -- Verificar si teníamos esta misión antes y si ha cambiado de estado
+            local previousState = nil
+            
+            if self.db.account.questsByTitle[title] then
+                for _, questID in ipairs(self.db.account.questsByTitle[title]) do
+                    local quest = self.db.account.quests[questID]
+                    if quest and quest.status == "accepted" and (not quest.objectivesCompleted) then
+                        -- Los objetivos de esta misión se acaban de completar
+                        
+                        -- Obtener coordenadas actuales
+                        local x, y = GetPlayerMapPosition("player")
+                        x = math.floor(x * 10000) / 100
+                        y = math.floor(y * 10000) / 100
+                        local zone = GetZoneText()
+                        
+                        -- Actualizar el estado y guardar las coordenadas de completado
+                        quest.objectivesCompleted = true
+                        quest.objectivesCompletedTimestamp = time()
+                        quest.objectivesCompletedCoords = { x = x, y = y, zone = zone }
+                        
+                        -- Mover esta misión al principio de la lista
+                        self:MoveQuestToTop(questID)
+                        
+                        -- Mostrar un mensaje informativo
+                        self:Print("¡Objetivos completados para misión: " .. title .. " en " .. zone .. " (" .. x .. ", " .. y .. ")!")
+                        
+                        -- Actualizar la UI
+                        self:UpdateQuestList()
+                        break
+                    end
+                end
+            end
         end
     end
     

@@ -14,12 +14,13 @@ local defaults = {
     questOrder = {}, -- Nueva estructura para almacenar el orden personalizado de las misiones
 }
 
--- Colores para los diferentes estados de las misiones
+-- Colores para los diferentes estados de las misiones (modificar existente)
 QuestLog.colors = {
     accepted = "|cFFFFFFFF", -- Blanco
     completed = "|cFF00FF00", -- Verde
     abandoned = "|cFFFF0000", -- Rojo
     header = "|cFFFFD100",    -- Dorado/Amarillo
+    objectives_complete = "|cFF00FFFF", -- Cian (nuevo estado para objetivos completados)
 }
 
 -- Llevar un seguimiento de las misiones en el log para detectar abandonos
@@ -317,4 +318,47 @@ function QuestLog:MoveQuestDown(questID)
     
     -- Actualizar la UI
     self:UpdateQuestList()
+end
+
+-- Mejora 5: Añadir la función MoveQuestToTop si no la has añadido ya
+-- Ubicación: Core.lua, después de las funciones MoveQuestUp/MoveQuestDown
+
+function QuestLog:MoveQuestToTop(questID)
+    if not self.db.account.questOrder then
+        self.db.account.questOrder = {}
+        -- Inicializar el orden con el orden actual basado en timestamp
+        local quests = {}
+        for id, quest in pairs(self.db.account.quests) do
+            table.insert(quests, {id = id, timestamp = quest.timestamp or 0})
+        end
+        table.sort(quests, function(a, b) return (a.timestamp or 0) > (b.timestamp or 0) end)
+        for _, quest in ipairs(quests) do
+            table.insert(self.db.account.questOrder, quest.id)
+        end
+    end
+    
+    -- Encontrar el índice actual de la misión
+    local currentIndex = 0
+    for i, id in ipairs(self.db.account.questOrder) do
+        if id == questID then
+            currentIndex = i
+            break
+        end
+    end
+    
+    -- Si ya está al principio, no hacer nada
+    if currentIndex <= 1 then
+        if currentIndex == 0 then
+            table.insert(self.db.account.questOrder, 1, questID)
+        end
+        return
+    end
+    
+    -- Quitar de su posición actual
+    table.remove(self.db.account.questOrder, currentIndex)
+    
+    -- Añadir al principio
+    table.insert(self.db.account.questOrder, 1, questID)
+    
+    -- No es necesario actualizar la UI aquí, se hará después
 end

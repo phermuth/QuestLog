@@ -2,23 +2,52 @@
 -- Funciones de la interfaz de usuario para QuestLog
 
 -- Reemplaza la función UpdateQuestList en UI.lua con esta versión mejorada
+-- Mejora 3: Actualizar función UpdateQuestList para mostrar el nuevo estado
+-- Modificar la función UpdateQuestList en UI.lua
+
 function QuestLog:UpdateQuestList()
     local quests = self:GetQuestList()
     
     -- Ordenar por timestamp (más recientes primero) si no hay un orden personalizado
     if not self.db.account.questOrder or not next(self.db.account.questOrder) then
         table.sort(quests, function(a, b) 
-            -- Primero ordenar por completedTimestamp si existe (misiones entregadas)
-            if a.completedTimestamp and b.completedTimestamp then
-                return a.completedTimestamp > b.completedTimestamp
-            elseif a.completedTimestamp then
-                return true -- Las misiones completadas aparecen primero
-            elseif b.completedTimestamp then
+            -- Si ambas misiones tienen el mismo estado, priorizar por timestamp
+            if a.status == b.status then
+                -- Para misiones aceptadas, priorizar las que tienen objetivos completados
+                if a.status == "accepted" then
+                    if a.objectivesCompleted and not b.objectivesCompleted then
+                        return true
+                    elseif not a.objectivesCompleted and b.objectivesCompleted then
+                        return false
+                    end
+                end
+                
+                return (a.timestamp or 0) > (b.timestamp or 0)
+            end
+            
+            -- Priorizar misiones con objetivos completados
+            if a.status == "accepted" and a.objectivesCompleted and not (b.status == "accepted" and b.objectivesCompleted) then
+                return true
+            elseif b.status == "accepted" and b.objectivesCompleted and not (a.status == "accepted" and a.objectivesCompleted) then
                 return false
             end
             
-            -- Luego ordenar por timestamp (fecha de aceptación) para las no completadas
-            return (a.timestamp or 0) > (b.timestamp or 0) 
+            -- Luego priorizar misiones activas sobre las completadas/abandonadas
+            if a.status == "accepted" and b.status ~= "accepted" then
+                return true
+            elseif a.status ~= "accepted" and b.status == "accepted" then
+                return false
+            end
+            
+            -- Luego priorizar completadas sobre abandonadas
+            if a.status == "completed" and b.status == "abandoned" then
+                return true
+            elseif a.status == "abandoned" and b.status == "completed" then
+                return false
+            end
+            
+            -- Si llegamos aquí, tienen mismo estado, ordenar por timestamp
+            return (a.timestamp or 0) > (b.timestamp or 0)
         end)
     end
     
@@ -60,13 +89,28 @@ function QuestLog:UpdateQuestList()
         
         if index <= numEntries then
             local quest = quests[index]
-            local statusColor = self.colors[quest.status] or self.colors.accepted
             
-            -- Añadimos indicador visual para mostrar cuándo se completó o entregó
+            -- Determinar el color basado en el estado
+            local statusColor
+            if quest.status == "accepted" and quest.objectivesCompleted then
+                statusColor = self.colors.objectives_complete -- Color para objetivos completados
+            else
+                statusColor = self.colors[quest.status] or self.colors.accepted
+            end
+            
+            -- Añadimos indicador visual para mostrar el estado
             local titleText = statusColor .. quest.title .. " |r[" .. quest.level .. "]"
+            
+            -- Añadir indicadores de tiempo para los diferentes estados
             if quest.status == "completed" and quest.completedTimestamp then
                 local timeAgo = self:FormatTimeAgo(time() - quest.completedTimestamp)
                 titleText = titleText .. " |cff7f7f7f(" .. timeAgo .. ")|r"
+            elseif quest.status == "accepted" and quest.objectivesCompleted and quest.objectivesCompletedTimestamp then
+                local timeAgo = self:FormatTimeAgo(time() - quest.objectivesCompletedTimestamp)
+                titleText = titleText .. " |cff00ffff(Listo: " .. timeAgo .. ")|r"
+            elseif quest.status == "accepted" and quest.timestamp then
+                local timeAgo = self:FormatTimeAgo(time() - quest.timestamp)
+                titleText = titleText .. " |cffaaaaff(" .. timeAgo .. ")|r"
             end
             
             button.title:SetText(titleText)
@@ -74,8 +118,13 @@ function QuestLog:UpdateQuestList()
             button.upButton.questID = quest.questID
             button.downButton.questID = quest.questID
             
+            -- Mostrar coordenadas relevantes según el estado
             local coordText = ""
-            if quest.acceptCoords then
+            if quest.status == "accepted" and quest.objectivesCompleted and quest.objectivesCompletedCoords then
+                -- Para misiones con objetivos completados, mostrar dónde se completaron
+                coordText = quest.objectivesCompletedCoords.zone .. " (" .. quest.objectivesCompletedCoords.x .. ", " .. quest.objectivesCompletedCoords.y .. ")"
+            elseif quest.acceptCoords then
+                -- Para otras misiones, mostrar dónde se aceptaron
                 coordText = quest.acceptCoords.zone .. " (" .. quest.acceptCoords.x .. ", " .. quest.acceptCoords.y .. ")"
             end
             button.coords:SetText(coordText)

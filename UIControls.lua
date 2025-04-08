@@ -87,6 +87,9 @@ function QuestLog:ShowQuestLogFrame()
     self:UpdateQuestList()
 end
 
+-- Mejora 4: Actualizar la información de detalles de la misión para mostrar las coordenadas de completado
+-- Modificar la función SelectQuest en UIControls.lua
+
 function QuestLog:SelectQuest(questID)
     self.selectedQuest = questID
     local quest = self.db.account.quests[questID]
@@ -104,7 +107,13 @@ function QuestLog:SelectQuest(questID)
     
     local text = self.colors.header .. "Misión: |r" .. quest.title .. "\n\n"
     text = text .. self.colors.header .. "Nivel: |r" .. quest.level .. "\n"
-    text = text .. self.colors.header .. "Estado: |r" .. (statusText[quest.status] or "Desconocido") .. "\n"
+    
+    -- Estado modificado para incluir información de objetivos completados
+    local status = statusText[quest.status] or "Desconocido"
+    if quest.status == "accepted" and quest.objectivesCompleted then
+        status = status .. " (Objetivos Completados)"
+    end
+    text = text .. self.colors.header .. "Estado: |r" .. status .. "\n"
     
     -- Mostrar los diferentes niveles del personaje durante el ciclo de la misión
     if quest.playerLevel then
@@ -130,6 +139,19 @@ function QuestLog:SelectQuest(questID)
     if quest.acceptCoords then
         text = text .. self.colors.header .. "Aceptada en: |r" .. quest.acceptCoords.zone .. "\n"
         text = text .. "Coordenadas: (" .. quest.acceptCoords.x .. ", " .. quest.acceptCoords.y .. ")\n\n"
+    end
+    
+    -- Añadir información de coordenadas de objetivos completados
+    if quest.objectivesCompletedCoords then
+        text = text .. self.colors.header .. "Objetivos completados en: |r" .. quest.objectivesCompletedCoords.zone .. "\n"
+        text = text .. "Coordenadas: (" .. quest.objectivesCompletedCoords.x .. ", " .. quest.objectivesCompletedCoords.y .. ")\n"
+        
+        if quest.objectivesCompletedTimestamp then
+            local completedTime = date("%Y-%m-%d %H:%M:%S", quest.objectivesCompletedTimestamp)
+            text = text .. "Fecha: " .. completedTime .. "\n\n"
+        else
+            text = text .. "\n"
+        end
     end
     
     if quest.turnInCoords then
