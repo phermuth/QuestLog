@@ -106,12 +106,18 @@ function QuestLog:SelectQuest(questID)
     text = text .. self.colors.header .. "Nivel: |r" .. quest.level .. "\n"
     text = text .. self.colors.header .. "Estado: |r" .. (statusText[quest.status] or "Desconocido") .. "\n"
     
-    -- Mostrar nivel del jugador al aceptar y completar
+    -- Mostrar los diferentes niveles del personaje durante el ciclo de la misión
     if quest.playerLevel then
         text = text .. self.colors.header .. "Nivel al aceptar: |r" .. quest.playerLevel .. "\n"
     end
     if quest.completionLevel then
         text = text .. self.colors.header .. "Nivel al completar: |r" .. quest.completionLevel .. "\n"
+    end
+    if quest.turnInLevel then
+        text = text .. self.colors.header .. "Nivel al entregar: |r" .. quest.turnInLevel .. "\n"
+    end
+    if quest.abandonLevel then
+        text = text .. self.colors.header .. "Nivel al abandonar: |r" .. quest.abandonLevel .. "\n"
     end
     
     -- Mostrar XP ganada si está disponible
@@ -222,6 +228,12 @@ function QuestLog:ExportData()
         end
         if quest.completionLevel then
             output = output .. "Nivel al completar: " .. quest.completionLevel .. "\n"
+        end
+        if quest.turnInLevel then
+            output = output .. "Nivel al entregar: " .. quest.turnInLevel .. "\n"
+        end
+        if quest.abandonLevel then
+            output = output .. "Nivel al abandonar: " .. quest.abandonLevel .. "\n"
         end
         
         if quest.acceptCoords then

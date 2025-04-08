@@ -133,6 +133,9 @@ function QuestLog:QUEST_COMPLETE()
     
     self.lastCompletedQuest = title
     self:Print("Misión lista para entregar: " .. title)
+    
+    -- Guardar el nivel del jugador en el momento de completar (antes de entregar)
+    self.completionPlayerLevel = UnitLevel("player")
 end
 
 function QuestLog:QUEST_FINISHED()
@@ -155,7 +158,7 @@ function QuestLog:QUEST_FINISHED()
     -- Intentar capturar la XP de la misión
     local xpGained = self:CaptureQuestXP()
     
-    -- Obtener el nivel actual del jugador
+    -- Obtener el nivel actual del jugador (nivel de entrega)
     local playerLevel = UnitLevel("player")
     
     -- Buscar si tenemos esta misión en nuestra base de datos
@@ -168,7 +171,9 @@ function QuestLog:QUEST_FINISHED()
                 quest.status = "completed"
                 quest.completedTimestamp = time()
                 quest.completionTime = quest.completedTimestamp - quest.timestamp
-                quest.completionLevel = playerLevel
+                -- Usar el nivel capturado en QUEST_COMPLETE si está disponible
+                quest.completionLevel = self.completionPlayerLevel or playerLevel
+                quest.turnInLevel = playerLevel
                 quest.xpGained = xpGained
                 
                 self:Print("Misión completada: " .. title .. " en " .. zone .. " (" .. x .. ", " .. y .. ")")
@@ -199,8 +204,9 @@ function QuestLog:QUEST_FINISHED()
             timestamp = time(),
             completedTimestamp = time(),
             completionTime = 0,
-            playerLevel = playerLevel,
-            completionLevel = playerLevel,
+            playerLevel = playerLevel,   -- En este caso, no conocemos el nivel de aceptación real
+            completionLevel = playerLevel, -- Asumimos que fue completada al mismo nivel
+            turnInLevel = playerLevel,
             xpGained = xpGained,
         }
         
@@ -220,6 +226,7 @@ function QuestLog:QUEST_FINISHED()
     self.lastCompletedQuest = nil
     self.questTitle = nil
     self.xpBeforeTurnIn = nil
+    self.completionPlayerLevel = nil
     
     -- Actualizar la UI
     self:UpdateQuestList()
@@ -244,6 +251,7 @@ function QuestLog:QUEST_LOG_UPDATE()
                 if quest and quest.status == "accepted" then
                     quest.status = "abandoned"
                     quest.abandonedTimestamp = time()
+                    quest.abandonLevel = UnitLevel("player")  -- Añadimos el nivel al abandonar
                     self:Print("Misión abandonada: " .. title)
                     self:UpdateQuestList()
                     break

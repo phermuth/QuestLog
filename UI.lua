@@ -7,7 +7,19 @@ function QuestLog:UpdateQuestList()
     
     -- Ordenar por timestamp (más recientes primero) si no hay un orden personalizado
     if not self.db.account.questOrder or not next(self.db.account.questOrder) then
-        table.sort(quests, function(a, b) return (a.timestamp or 0) > (b.timestamp or 0) end)
+        table.sort(quests, function(a, b) 
+            -- Primero ordenar por completedTimestamp si existe (misiones entregadas)
+            if a.completedTimestamp and b.completedTimestamp then
+                return a.completedTimestamp > b.completedTimestamp
+            elseif a.completedTimestamp then
+                return true -- Las misiones completadas aparecen primero
+            elseif b.completedTimestamp then
+                return false
+            end
+            
+            -- Luego ordenar por timestamp (fecha de aceptación) para las no completadas
+            return (a.timestamp or 0) > (b.timestamp or 0) 
+        end)
     end
     
     local numEntries = table.getn(quests)
@@ -50,7 +62,14 @@ function QuestLog:UpdateQuestList()
             local quest = quests[index]
             local statusColor = self.colors[quest.status] or self.colors.accepted
             
-            button.title:SetText(statusColor .. quest.title .. " |r[" .. quest.level .. "]")
+            -- Añadimos indicador visual para mostrar cuándo se completó o entregó
+            local titleText = statusColor .. quest.title .. " |r[" .. quest.level .. "]"
+            if quest.status == "completed" and quest.completedTimestamp then
+                local timeAgo = self:FormatTimeAgo(time() - quest.completedTimestamp)
+                titleText = titleText .. " |cff7f7f7f(" .. timeAgo .. ")|r"
+            end
+            
+            button.title:SetText(titleText)
             button.questID = quest.questID
             button.upButton.questID = quest.questID
             button.downButton.questID = quest.questID
@@ -72,6 +91,18 @@ function QuestLog:UpdateQuestList()
     end
 end
 
+-- Añadir función para formatear tiempo relativo (cuánto tiempo ha pasado)
+function QuestLog:FormatTimeAgo(seconds)
+    if seconds < 60 then
+        return seconds .. "s"
+    elseif seconds < 3600 then
+        return math.floor(seconds/60) .. "m"
+    elseif seconds < 86400 then
+        return math.floor(seconds/3600) .. "h"
+    else
+        return math.floor(seconds/86400) .. "d"
+    end
+end
 
 -- Función para desplazarse hacia arriba
 function QuestLog:ScrollUp()
