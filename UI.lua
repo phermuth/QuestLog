@@ -81,6 +81,20 @@ function QuestLog:UpdateQuestList()
             self.scrollDownButton:Disable()
         end
     end
+
+    -- Versión más compacta de la visualización de coordenadas
+    local function formatCoords(zone, x, y)
+        -- Abreviar nombres de zona muy largos
+        if string.len(zone) > 8 then
+            zone = string.sub(zone, 1, 8) .. ".."
+        end
+        
+        -- Coordenadas sin espacios y redondeadas si son necesarias
+        local xDisplay = math.floor(x * 10) / 10
+        local yDisplay = math.floor(y * 10) / 10
+        
+        return zone .. "(" .. xDisplay .. "," .. yDisplay .. ")"
+    end
     
     -- Actualizar cada botón
     for i = 1, maxDisplayed do
@@ -121,14 +135,14 @@ function QuestLog:UpdateQuestList()
             -- Mostrar coordenadas relevantes según el estado
             local coordText = ""
             if quest.status == "accepted" and quest.objectivesCompleted and quest.objectivesCompletedCoords then
-                -- Para misiones con objetivos completados, mostrar dónde se completaron
-                coordText = quest.objectivesCompletedCoords.zone .. " (" .. quest.objectivesCompletedCoords.x .. ", " .. quest.objectivesCompletedCoords.y .. ")"
+                local coords = quest.objectivesCompletedCoords
+                coordText = formatCoords(coords.zone, coords.x, coords.y)
             elseif quest.status == "completed" and quest.turnInCoords then
-                -- Para misiones completadas, mostrar dónde se entregaron
-                coordText = quest.turnInCoords.zone .. " (" .. quest.turnInCoords.x .. ", " .. quest.turnInCoords.y .. ")"
+                local coords = quest.turnInCoords
+                coordText = formatCoords(coords.zone, coords.x, coords.y)
             elseif quest.acceptCoords then
-                -- Para otras misiones, mostrar dónde se aceptaron
-                coordText = quest.acceptCoords.zone .. " (" .. quest.acceptCoords.x .. ", " .. quest.acceptCoords.y .. ")"
+                local coords = quest.acceptCoords
+                coordText = formatCoords(coords.zone, coords.x, coords.y)
             end
             button.coords:SetText(coordText)
             
@@ -363,11 +377,12 @@ end
 
 -- Funciones para la interfaz de usuario
 -- Reemplaza la función CreateQuestLogFrame con esta versión personalizada
+-- Esta función crea la interfaz gráfica principal
 function QuestLog:CreateQuestLogFrame()
     -- Crear frame principal
     local frame = CreateFrame("Frame", "QuestLogFrame", UIParent)
     frame:SetFrameStrata("DIALOG")
-    frame:SetWidth(500)
+    frame:SetWidth(550)  -- Aumentar el ancho del marco principal para acomodar los botones
     frame:SetHeight(400)
     frame:SetPoint("CENTER", UIParent, "CENTER")
     frame:SetBackdrop({
@@ -404,8 +419,8 @@ function QuestLog:CreateQuestLogFrame()
     
     -- Área para la lista de misiones (que reemplaza al ScrollFrame)
     local listArea = CreateFrame("Frame", "QuestLogListArea", frame)
-    listArea:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -40)
-    listArea:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -40, 40)
+    listArea:SetPoint("TOPLEFT", frame, "TOPLEFT", 45, -40)  -- Mover más a la derecha para dar espacio a los botones
+    listArea:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -25, 40)  -- Ajustar para dejar espacio para la barra de desplazamiento
     
     -- Botón de desplazamiento hacia arriba
     local scrollUpButton = CreateFrame("Button", "QuestLogScrollUpButton", frame, "UIPanelScrollUpButtonTemplate")
@@ -434,14 +449,16 @@ function QuestLog:CreateQuestLogFrame()
         
         button:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
         
+        -- Modificación para el título de la misión - reducir ancho para dar más espacio a coordenadas
         local title = button:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         title:SetPoint("LEFT", button, "LEFT", 5, 0)
-        title:SetWidth(300)
+        title:SetWidth(280) -- Reducido de 300 a 280
         title:SetJustifyH("LEFT")
         
-        local coords = button:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        coords:SetPoint("RIGHT", button, "RIGHT", -5, 0)
-        coords:SetWidth(130)
+        -- Modificación para las coordenadas - cambiar a formato compacto en una sola línea
+        local coords = button:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall") -- Usar fuente más pequeña
+        coords:SetPoint("RIGHT", button, "RIGHT", -20, 0) -- 20px de margen desde el borde derecho
+        coords:SetWidth(130) -- Aumentado ligeramente el ancho
         coords:SetJustifyH("RIGHT")
         
         button.title = title
