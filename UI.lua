@@ -5,6 +5,7 @@
 -- Mejora 3: Actualizar función UpdateQuestList para mostrar el nuevo estado
 -- Modificar la función UpdateQuestList en UI.lua
 
+-- Mejora para la función UpdateQuestList en UI.lua para mostrar el nuevo estado más claramente
 function QuestLog:UpdateQuestList()
     local quests = self:GetQuestList()
     
@@ -116,9 +117,9 @@ function QuestLog:UpdateQuestList()
             local titleText = statusColor .. quest.title .. " |r[" .. quest.level .. "]"
             
             -- Añadir indicadores de tiempo para los diferentes estados
-            if quest.status == "completed" and quest.completedTimestamp then
-                local timeAgo = self:FormatTimeAgo(time() - quest.completedTimestamp)
-                titleText = titleText .. " |cff7f7f7f(" .. timeAgo .. ")|r"
+            if quest.status == "completed" and quest.turnInTimestamp then
+                local timeAgo = self:FormatTimeAgo(time() - quest.turnInTimestamp)
+                titleText = titleText .. " |cff7f7f7f(Entregada: " .. timeAgo .. ")|r"
             elseif quest.status == "accepted" and quest.objectivesCompleted and quest.objectivesCompletedTimestamp then
                 local timeAgo = self:FormatTimeAgo(time() - quest.objectivesCompletedTimestamp)
                 titleText = titleText .. " |cff00ffff(Listo: " .. timeAgo .. ")|r"

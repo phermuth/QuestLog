@@ -91,6 +91,7 @@ end
 -- Modificar la función SelectQuest en UIControls.lua
 
 -- Actualización de SelectQuest en UIControls.lua para mostrar todos los detalles
+-- Mejora para la función SelectQuest en UIControls.lua para mostrar todos los detalles
 function QuestLog:SelectQuest(questID)
     self.selectedQuest = questID
     local quest = self.db.account.quests[questID]
@@ -121,7 +122,7 @@ function QuestLog:SelectQuest(questID)
         text = text .. self.colors.header .. "Nivel al aceptar: |r" .. quest.playerLevel .. "\n"
     end
     if quest.completionLevel then
-        text = text .. self.colors.header .. "Nivel al completar: |r" .. quest.completionLevel .. "\n"
+        text = text .. self.colors.header .. "Nivel al completar objetivos: |r" .. quest.completionLevel .. "\n"
     end
     if quest.turnInLevel then
         text = text .. self.colors.header .. "Nivel al entregar: |r" .. quest.turnInLevel .. "\n"
@@ -142,7 +143,7 @@ function QuestLog:SelectQuest(questID)
         text = text .. "Coordenadas: (" .. quest.acceptCoords.x .. ", " .. quest.acceptCoords.y .. ")\n\n"
     end
     
-    -- Añadir información de coordenadas de objetivos completados
+    -- Añadir información de coordenadas de objetivos completados (ahora es una sección separada)
     if quest.objectivesCompletedCoords then
         text = text .. self.colors.header .. "Objetivos completados en: |r" .. quest.objectivesCompletedCoords.zone .. "\n"
         text = text .. "Coordenadas: (" .. quest.objectivesCompletedCoords.x .. ", " .. quest.objectivesCompletedCoords.y .. ")\n"
@@ -157,7 +158,14 @@ function QuestLog:SelectQuest(questID)
     
     if quest.turnInCoords then
         text = text .. self.colors.header .. "Entregada en: |r" .. quest.turnInCoords.zone .. "\n"
-        text = text .. "Coordenadas: (" .. quest.turnInCoords.x .. ", " .. quest.turnInCoords.y .. ")\n\n"
+        text = text .. "Coordenadas: (" .. quest.turnInCoords.x .. ", " .. quest.turnInCoords.y .. ")\n"
+        
+        if quest.turnInTimestamp then
+            local turnInTime = date("%Y-%m-%d %H:%M:%S", quest.turnInTimestamp)
+            text = text .. "Fecha: " .. turnInTime .. "\n\n"
+        else
+            text = text .. "\n"
+        end
     end
     
     if quest.completionTime and quest.completionTime > 0 then

@@ -24,7 +24,7 @@ QuestLog.colors = {
     completed = "|cFF00FF00", -- Verde
     abandoned = "|cFFFF0000", -- Rojo
     header = "|cFFFFD100",    -- Dorado/Amarillo
-    objectives_complete = "|cFF00FFFF", -- Cian (nuevo estado para objetivos completados)
+    objectives_complete = "|cFF00FFFF", -- Cian (estado para objetivos completados)
 }
 
 -- Llevar un seguimiento de las misiones en el log para detectar abandonos

@@ -170,6 +170,9 @@ function QuestLog:QUEST_FINISHED()
                 quest.turnInCoords = { x = x, y = y, zone = zone }
                 quest.status = "completed"
                 quest.completedTimestamp = time()
+                quest.turnInTimestamp = time()  -- Nueva propiedad para diferenciar
+                
+                -- Conservar la información de objetivos completados
                 quest.completionTime = quest.completedTimestamp - quest.timestamp
                 
                 -- Usar el nivel capturado en QUEST_COMPLETE si está disponible
@@ -181,7 +184,7 @@ function QuestLog:QUEST_FINISHED()
                 self:MoveQuestToTop(questID)
                 
                 -- Mostrar mensajes informativos
-                self:Print("Misión completada: " .. title .. " en " .. zone .. " (" .. x .. ", " .. y .. ")")
+                self:Print("Misión entregada: " .. title .. " en " .. zone .. " (" .. x .. ", " .. y .. ")")
                 self:Print("Tiempo de completado: " .. self:FormatTime(quest.completionTime))
                 if xpGained > 0 then
                     self:Print("Experiencia ganada: " .. xpGained .. " XP")
@@ -208,6 +211,7 @@ function QuestLog:QUEST_FINISHED()
             status = "completed",
             timestamp = time(),
             completedTimestamp = time(),
+            turnInTimestamp = time(),  -- Nueva propiedad para diferenciar
             completionTime = 0,
             playerLevel = playerLevel,   -- En este caso, no conocemos el nivel de aceptación real
             completionLevel = playerLevel, -- Asumimos que fue completada al mismo nivel
@@ -224,7 +228,7 @@ function QuestLog:QUEST_FINISHED()
             table.insert(self.db.account.questOrder, 1, questID)
         end
         
-        self:Print("Misión registrada y completada: " .. title)
+        self:Print("Misión registrada y entregada: " .. title)
         if xpGained > 0 then
             self:Print("Experiencia ganada: " .. xpGained .. " XP")
         else
@@ -244,6 +248,8 @@ function QuestLog:QUEST_FINISHED()
 end
 
 -- Esta nueva implementación rastreará con precisión cuándo cambia el estado de completado
+-- Esta parte mejora la función QUEST_LOG_UPDATE para detectar misiones completadas con mayor precisión
+
 function QuestLog:QUEST_LOG_UPDATE()
     local shouldUpdateUI = false
     
