@@ -135,6 +135,8 @@ function QuestLog:QUEST_COMPLETE()
     self.completionPlayerLevel = UnitLevel("player")
 end
 
+-- Modificar QUEST_FINISHED para preservar las coordenadas de objetivos completados
+-- Esta función se encuentra en EventHandlers.lua
 function QuestLog:QUEST_FINISHED()
     local title = self.lastCompletedQuest
     if not title then 
@@ -146,19 +148,11 @@ function QuestLog:QUEST_FINISHED()
         return
     end
     
-    -- Obtener coordenadas, preferentemente las que guardamos en QUEST_COMPLETE
-    local coords = self.lastTurnInCoords
-    local x, y, zone
-    
-    if coords then
-        x, y, zone = coords.x, coords.y, coords.zone
-    else
-        -- Fallback al método actual
-        x, y = GetPlayerMapPosition("player")
-        x = math.floor(x * 10000) / 100
-        y = math.floor(y * 10000) / 100
-        zone = GetZoneText()
-    end
+    -- Obtener coordenadas actuales
+    local x, y = GetPlayerMapPosition("player")
+    x = math.floor(x * 10000) / 100
+    y = math.floor(y * 10000) / 100
+    local zone = GetZoneText()
     
     -- Intentar capturar la XP de la misión
     local xpGained = self:CaptureQuestXP()
@@ -172,19 +166,21 @@ function QuestLog:QUEST_FINISHED()
         for _, questID in ipairs(self.db.account.questsByTitle[title]) do
             local quest = self.db.account.quests[questID]
             if quest and quest.status == "accepted" then
+                -- Guardar las coordenadas de entrega
                 quest.turnInCoords = { x = x, y = y, zone = zone }
                 quest.status = "completed"
                 quest.completedTimestamp = time()
                 quest.completionTime = quest.completedTimestamp - quest.timestamp
+                
                 -- Usar el nivel capturado en QUEST_COMPLETE si está disponible
                 quest.completionLevel = self.completionPlayerLevel or playerLevel
                 quest.turnInLevel = playerLevel
                 quest.xpGained = xpGained
                 
                 -- Mover esta misión al principio del orden personalizado
-                -- para mantener las misiones recién completadas fácilmente accesibles
                 self:MoveQuestToTop(questID)
                 
+                -- Mostrar mensajes informativos
                 self:Print("Misión completada: " .. title .. " en " .. zone .. " (" .. x .. ", " .. y .. ")")
                 self:Print("Tiempo de completado: " .. self:FormatTime(quest.completionTime))
                 if xpGained > 0 then
@@ -247,63 +243,71 @@ function QuestLog:QUEST_FINISHED()
     self:UpdateQuestList()
 end
 
+-- Esta nueva implementación rastreará con precisión cuándo cambia el estado de completado
 function QuestLog:QUEST_LOG_UPDATE()
-    -- Obtener todas las misiones actuales
+    local shouldUpdateUI = false
+    
+    -- Guardar el estado actual de todas las misiones del log
     local newQuestLog = {}
-    local currentQuests = {}
+    local currentQuestStates = {}
     
     for i=1, GetNumQuestLogEntries() do
-        local title, _, _, isHeader, isCollapsed, isComplete = GetQuestLogTitle(i)
+        local title, _, _, isHeader, _, isComplete = GetQuestLogTitle(i)
         if not isHeader and title then
             newQuestLog[title] = true
+            -- Guardar el estado actual de la misión (0 = en progreso, 1 = objetivos completados)
+            currentQuestStates[title] = isComplete
             
-            -- Almacenar el estado actual de la misión para comprobar si se ha completado
-            currentQuests[title] = {
-                isComplete = isComplete,
-                index = i
-            }
-        end
-    end
-    
-    -- Comprobar misiones que han cambiado su estado a "objetivos completados"
-    for title, info in pairs(currentQuests) do
-        if info.isComplete == 1 then -- 1 = objetivos completados
-            -- Verificar si teníamos esta misión antes y si ha cambiado de estado
-            local previousState = nil
+            -- Si no tenemos un cache previo para esta misión, inicializar
+            if self.questStateCache[title] == nil then
+                self.questStateCache[title] = isComplete
+            end
             
-            if self.db.account.questsByTitle[title] then
-                for _, questID in ipairs(self.db.account.questsByTitle[title]) do
-                    local quest = self.db.account.quests[questID]
-                    if quest and quest.status == "accepted" and (not quest.objectivesCompleted) then
-                        -- Los objetivos de esta misión se acaban de completar
-                        
-                        -- Obtener coordenadas actuales
-                        local x, y = GetPlayerMapPosition("player")
-                        x = math.floor(x * 10000) / 100
-                        y = math.floor(y * 10000) / 100
-                        local zone = GetZoneText()
-                        
-                        -- Actualizar el estado y guardar las coordenadas de completado
-                        quest.objectivesCompleted = true
-                        quest.objectivesCompletedTimestamp = time()
-                        quest.objectivesCompletedCoords = { x = x, y = y, zone = zone }
-                        
-                        -- Mover esta misión al principio de la lista
-                        self:MoveQuestToTop(questID)
-                        
-                        -- Mostrar un mensaje informativo
-                        self:Print("¡Objetivos completados para misión: " .. title .. " en " .. zone .. " (" .. x .. ", " .. y .. ")!")
-                        
-                        -- Actualizar la UI
-                        self:UpdateQuestList()
-                        break
+            -- Detectar si la misión acaba de completar sus objetivos
+            if isComplete == 1 and self.questStateCache[title] == 0 then
+                -- ¡Los objetivos acaban de completarse!
+                self:Print("¡Los objetivos de la misión " .. title .. " se han completado!")
+                
+                -- Encontrar esta misión en nuestra base de datos
+                if self.db.account.questsByTitle[title] then
+                    for _, questID in ipairs(self.db.account.questsByTitle[title]) do
+                        local quest = self.db.account.quests[questID]
+                        if quest and quest.status == "accepted" and (not quest.objectivesCompleted) then
+                            -- Obtener coordenadas actuales
+                            local x, y = GetPlayerMapPosition("player")
+                            x = math.floor(x * 10000) / 100
+                            y = math.floor(y * 10000) / 100
+                            local zone = GetZoneText()
+                            
+                            -- Actualizar estado y guardar coordenadas de completado
+                            quest.objectivesCompleted = true
+                            quest.objectivesCompletedTimestamp = time()
+                            quest.objectivesCompletedCoords = { x = x, y = y, zone = zone }
+                            
+                            -- Mover al principio de la lista
+                            self:MoveQuestToTop(questID)
+                            
+                            self:Print("Objetivos completados en: " .. zone .. " (" .. x .. ", " .. y .. ")")
+                            shouldUpdateUI = true
+                            break
+                        end
                     end
                 end
             end
+            
+            -- Actualizar nuestro cache con el estado actual
+            self.questStateCache[title] = isComplete
         end
     end
     
-    -- Buscar misiones que estaban en el log pero ya no están (posiblemente abandonadas)
+    -- Limpiar misiones que ya no están en el log del cache
+    for title in pairs(self.questStateCache) do
+        if not currentQuestStates[title] then
+            self.questStateCache[title] = nil
+        end
+    end
+    
+    -- Detectar misiones abandonadas
     for title in pairs(self.currentQuestLog) do
         if not newQuestLog[title] and self.db.account.questsByTitle[title] then
             -- Buscar entre las misiones con este título
@@ -312,9 +316,9 @@ function QuestLog:QUEST_LOG_UPDATE()
                 if quest and quest.status == "accepted" then
                     quest.status = "abandoned"
                     quest.abandonedTimestamp = time()
-                    quest.abandonLevel = UnitLevel("player")  -- Añadimos el nivel al abandonar
+                    quest.abandonLevel = UnitLevel("player")
                     self:Print("Misión abandonada: " .. title)
-                    self:UpdateQuestList()
+                    shouldUpdateUI = true
                     break
                 end
             end
@@ -323,4 +327,9 @@ function QuestLog:QUEST_LOG_UPDATE()
     
     -- Actualizar nuestro registro del log
     self.currentQuestLog = newQuestLog
+    
+    -- Actualizar la UI solo si es necesario
+    if shouldUpdateUI then
+        self:UpdateQuestList()
+    end
 end

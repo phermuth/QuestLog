@@ -90,6 +90,7 @@ end
 -- Mejora 4: Actualizar la información de detalles de la misión para mostrar las coordenadas de completado
 -- Modificar la función SelectQuest en UIControls.lua
 
+-- Actualización de SelectQuest en UIControls.lua para mostrar todos los detalles
 function QuestLog:SelectQuest(questID)
     self.selectedQuest = questID
     local quest = self.db.account.quests[questID]
@@ -160,7 +161,7 @@ function QuestLog:SelectQuest(questID)
     end
     
     if quest.completionTime and quest.completionTime > 0 then
-        text = text .. self.colors.header .. "Tiempo de completado: |r" .. self:FormatTime(quest.completionTime) .. "\n\n"
+        text = text .. self.colors.header .. "Tiempo total: |r" .. self:FormatTime(quest.completionTime) .. "\n\n"
     end
     
     if quest.manualCoords and table.getn(quest.manualCoords) > 0 then

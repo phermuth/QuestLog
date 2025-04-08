@@ -93,7 +93,7 @@ function QuestLog:UpdateQuestList()
             -- Determinar el color basado en el estado
             local statusColor
             if quest.status == "accepted" and quest.objectivesCompleted then
-                statusColor = self.colors.objectives_complete -- Color para objetivos completados
+                statusColor = self.colors.objectives_complete or "|cFF00FFFF" -- Color cian para objetivos completados
             else
                 statusColor = self.colors[quest.status] or self.colors.accepted
             end
@@ -123,6 +123,9 @@ function QuestLog:UpdateQuestList()
             if quest.status == "accepted" and quest.objectivesCompleted and quest.objectivesCompletedCoords then
                 -- Para misiones con objetivos completados, mostrar dónde se completaron
                 coordText = quest.objectivesCompletedCoords.zone .. " (" .. quest.objectivesCompletedCoords.x .. ", " .. quest.objectivesCompletedCoords.y .. ")"
+            elseif quest.status == "completed" and quest.turnInCoords then
+                -- Para misiones completadas, mostrar dónde se entregaron
+                coordText = quest.turnInCoords.zone .. " (" .. quest.turnInCoords.x .. ", " .. quest.turnInCoords.y .. ")"
             elseif quest.acceptCoords then
                 -- Para otras misiones, mostrar dónde se aceptaron
                 coordText = quest.acceptCoords.zone .. " (" .. quest.acceptCoords.x .. ", " .. quest.acceptCoords.y .. ")"

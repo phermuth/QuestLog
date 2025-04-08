@@ -14,6 +14,10 @@ local defaults = {
     questOrder = {}, -- Nueva estructura para almacenar el orden personalizado de las misiones
 }
 
+-- Inicializar el cache de estado de misiones como una variable separada
+-- Debe estar FUERA de la tabla defaults
+QuestLog.questStateCache = {}
+
 -- Colores para los diferentes estados de las misiones (modificar existente)
 QuestLog.colors = {
     accepted = "|cFFFFFFFF", -- Blanco
@@ -94,6 +98,9 @@ function QuestLog:OnInitialize()
             },
         },
     })
+
+    -- Inicializar el cache de estado de misiones
+    self.questStateCache = {}
     
     -- Inicializar la interfaz de usuario
     self:CreateQuestLogFrame()
@@ -359,6 +366,4 @@ function QuestLog:MoveQuestToTop(questID)
     
     -- Añadir al principio
     table.insert(self.db.account.questOrder, 1, questID)
-    
-    -- No es necesario actualizar la UI aquí, se hará después
 end
