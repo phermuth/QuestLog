@@ -376,6 +376,96 @@ function QuestLog:ShowStatsDialog(statsText)
     frame:Show()
 end
 
+function QuestLog:SelectQuest(questID)
+    self.selectedQuest = questID
+    local quest = self.db.account.quests[questID]
+    
+    if not quest then
+        self.detailContent:SetText("No se encontró información para esta misión.")
+        return
+    end
+    
+    local statusText = {
+        accepted = "Aceptada",
+        completed = "Completada",
+        abandoned = "Abandonada"
+    }
+    
+    local text = self.colors.header .. "Misión: |r" .. quest.title .. "\n\n"
+    text = text .. self.colors.header .. "Nivel: |r" .. quest.level .. "\n"
+    
+    -- Estado modificado para incluir información de objetivos completados
+    local status = statusText[quest.status] or "Desconocido"
+    if quest.status == "accepted" and quest.objectivesCompleted then
+        status = status .. " (Objetivos Completados)"
+    end
+    text = text .. self.colors.header .. "Estado: |r" .. status .. "\n"
+    
+    -- Mostrar los diferentes niveles del personaje durante el ciclo de la misión
+    if quest.playerLevel then
+        text = text .. self.colors.header .. "Nivel al aceptar: |r" .. quest.playerLevel .. "\n"
+    end
+    if quest.completionLevel then
+        text = text .. self.colors.header .. "Nivel al completar objetivos: |r" .. quest.completionLevel .. "\n"
+    end
+    if quest.turnInLevel then
+        text = text .. self.colors.header .. "Nivel al entregar: |r" .. quest.turnInLevel .. "\n"
+    end
+    if quest.abandonLevel then
+        text = text .. self.colors.header .. "Nivel al abandonar: |r" .. quest.abandonLevel .. "\n"
+    end
+    
+    -- Mostrar XP ganada si está disponible
+    if quest.xpGained and quest.xpGained > 0 then
+        text = text .. self.colors.header .. "Experiencia ganada: |r" .. quest.xpGained .. " XP\n"
+    end
+    
+    text = text .. "\n"
+    
+    if quest.acceptCoords then
+        text = text .. self.colors.header .. "Aceptada en: |r" .. quest.acceptCoords.zone .. "\n"
+        text = text .. "Coordenadas: (" .. quest.acceptCoords.x .. ", " .. quest.acceptCoords.y .. ")\n\n"
+    end
+    
+    -- Mostrar información de coordenadas de objetivos completados (ahora es una sección separada)
+    if quest.objectivesCompletedCoords then
+        text = text .. self.colors.header .. "Objetivos completados en: |r" .. quest.objectivesCompletedCoords.zone .. "\n"
+        text = text .. "Coordenadas: (" .. quest.objectivesCompletedCoords.x .. ", " .. quest.objectivesCompletedCoords.y .. ")\n"
+        
+        if quest.objectivesCompletedTimestamp then
+            local completedTime = date("%Y-%m-%d %H:%M:%S", quest.objectivesCompletedTimestamp)
+            text = text .. "Fecha: " .. completedTime .. "\n\n"
+        else
+            text = text .. "\n"
+        end
+    end
+    
+    if quest.turnInCoords then
+        text = text .. self.colors.header .. "Entregada en: |r" .. quest.turnInCoords.zone .. "\n"
+        text = text .. "Coordenadas: (" .. quest.turnInCoords.x .. ", " .. quest.turnInCoords.y .. ")\n"
+        
+        if quest.turnInTimestamp then
+            local turnInTime = date("%Y-%m-%d %H:%M:%S", quest.turnInTimestamp)
+            text = text .. "Fecha: " .. turnInTime .. "\n\n"
+        else
+            text = text .. "\n"
+        end
+    end
+    
+    if quest.completionTime and quest.completionTime > 0 then
+        text = text .. self.colors.header .. "Tiempo total: |r" .. self:FormatTime(quest.completionTime) .. "\n\n"
+    end
+    
+    if quest.manualCoords and table.getn(quest.manualCoords) > 0 then
+        text = text .. self.colors.header .. "Coordenadas manuales:\n|r"
+        for i, coord in ipairs(quest.manualCoords) do
+            text = text .. i .. ". " .. coord.zone .. " (" .. coord.x .. ", " .. coord.y .. ")\n"
+        end
+    end
+    
+    self.detailContent:SetText(text)
+end
+
 -- Funciones para la interfaz de usuario
 -- Reemplaza la función CreateQuestLogFrame con esta versión personalizada
 -- Esta función crea la interfaz gráfica principal

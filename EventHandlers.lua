@@ -65,6 +65,22 @@ function QuestLog:QUEST_ACCEPTED()
         return 
     end
     
+    -- Verificar que la base de datos exista
+    if not self.db or not self.db.account then
+        self:Print("Error: Base de datos no inicializada correctamente")
+        return
+    end
+    
+    -- Verificar que questsByTitle exista
+    if not self.db.account.questsByTitle then
+        self.db.account.questsByTitle = {}
+    end
+    
+    -- Verificar que quests exista
+    if not self.db.account.quests then
+        self.db.account.quests = {}
+    end
+    
     -- Buscamos la información de la misión en el registro de misiones
     local level = 1 -- Valor por defecto
     for i=1, GetNumQuestLogEntries() do
@@ -117,22 +133,30 @@ function QuestLog:QUEST_COMPLETE()
         return
     end
     
+    self:Print("QUEST_COMPLETE disparado para: " .. title)
+    
+    -- Verificar que la base de datos exista
+    if not self.db or not self.db.account then
+        self:Print("Error: Base de datos no inicializada correctamente")
+        return
+    end
+    
     -- Capturar XP antes de entregar la misión
     self.lastQuestXP = UnitXP("player")
     self.xpBeforeTurnIn = self.lastQuestXP
     
-    -- Obtener coordenadas actuales en la entrega (IMPORTANTE: agregado nuevo)
+    -- Obtener coordenadas actuales en la entrega
     local x, y = GetPlayerMapPosition("player")
     x = math.floor(x * 10000) / 100
     y = math.floor(y * 10000) / 100
     local zone = GetZoneText()
     self.lastTurnInCoords = { x = x, y = y, zone = zone }
     
-    self.lastCompletedQuest = title
-    self:Print("Misión lista para entregar: " .. title)
-    
-    -- Guardar el nivel del jugador en el momento de completar (antes de entregar)
+    -- Guardar el nivel del jugador en el momento de completar
     self.completionPlayerLevel = UnitLevel("player")
+    
+    self.lastCompletedQuest = title
+    self:Print("Misión lista para entregar: " .. title .. " en " .. zone .. " (" .. x .. ", " .. y .. ")")
 end
 
 -- Modificar QUEST_FINISHED para preservar las coordenadas de objetivos completados
@@ -148,7 +172,21 @@ function QuestLog:QUEST_FINISHED()
         return
     end
     
-    -- Obtener coordenadas actuales
+    self:Print("QUEST_FINISHED disparado para: " .. title)
+    
+    -- Verificar que la base de datos exista
+    if not self.db or not self.db.account then
+        self:Print("Error: Base de datos no inicializada correctamente")
+        return
+    end
+    
+    -- Verificar que questsByTitle exista
+    if not self.db.account.questsByTitle then
+        self:Print("Error: questsByTitle no existe")
+        return
+    end
+    
+    -- Obtener coordenadas actuales (respaldo por si lastTurnInCoords falla)
     local x, y = GetPlayerMapPosition("player")
     x = math.floor(x * 10000) / 100
     y = math.floor(y * 10000) / 100
@@ -167,12 +205,24 @@ function QuestLog:QUEST_FINISHED()
             local quest = self.db.account.quests[questID]
             if quest and quest.status == "accepted" then
                 -- Guardar las coordenadas de entrega
-                quest.turnInCoords = { x = x, y = y, zone = zone }
+                if self.lastTurnInCoords then
+                    quest.turnInCoords = self.lastTurnInCoords
+                else
+                    quest.turnInCoords = { x = x, y = y, zone = zone }
+                end
+                
                 quest.status = "completed"
                 quest.completedTimestamp = time()
-                quest.turnInTimestamp = time()  -- Nueva propiedad para diferenciar
+                quest.turnInTimestamp = time()
                 
                 -- Conservar la información de objetivos completados
+                if not quest.objectivesCompletedCoords and quest.objectivesCompleted then
+                    -- Si se sabe que objetivos están completados pero no hay coordenadas,
+                    -- usar las coordenadas actuales como respaldo
+                    quest.objectivesCompletedCoords = { x = x, y = y, zone = zone }
+                    quest.objectivesCompletedTimestamp = quest.objectivesCompletedTimestamp or time()
+                end
+                
                 quest.completionTime = quest.completedTimestamp - quest.timestamp
                 
                 -- Usar el nivel capturado en QUEST_COMPLETE si está disponible
@@ -185,7 +235,12 @@ function QuestLog:QUEST_FINISHED()
                 
                 -- Mostrar mensajes informativos
                 self:Print("Misión entregada: " .. title .. " en " .. zone .. " (" .. x .. ", " .. y .. ")")
+                if quest.objectivesCompletedCoords then
+                    self:Print("Objetivos completados en: " .. quest.objectivesCompletedCoords.zone .. 
+                             " (" .. quest.objectivesCompletedCoords.x .. ", " .. quest.objectivesCompletedCoords.y .. ")")
+                end
                 self:Print("Tiempo de completado: " .. self:FormatTime(quest.completionTime))
+                
                 if xpGained > 0 then
                     self:Print("Experiencia ganada: " .. xpGained .. " XP")
                 else
@@ -196,11 +251,18 @@ function QuestLog:QUEST_FINISHED()
                 break
             end
         end
+    else
+        self:Print("Error: No se encontró la misión " .. title .. " en la base de datos")
     end
     
     if not found then
+        self:Print("Nota: Creando nuevo registro para la misión entregada: " .. title)
         -- Si no encontramos la misión en nuestro registro, la añadimos como nueva
         local questID = self:GenerateQuestID(title, zone, time())
+        
+        if not self.db.account.quests then
+            self.db.account.quests = {}
+        end
         
         self.db.account.quests[questID] = {
             questID = questID,
@@ -211,10 +273,10 @@ function QuestLog:QUEST_FINISHED()
             status = "completed",
             timestamp = time(),
             completedTimestamp = time(),
-            turnInTimestamp = time(),  -- Nueva propiedad para diferenciar
+            turnInTimestamp = time(),
             completionTime = 0,
-            playerLevel = playerLevel,   -- En este caso, no conocemos el nivel de aceptación real
-            completionLevel = playerLevel, -- Asumimos que fue completada al mismo nivel
+            playerLevel = playerLevel,
+            completionLevel = playerLevel,
             turnInLevel = playerLevel,
             xpGained = xpGained,
         }
@@ -229,11 +291,6 @@ function QuestLog:QUEST_FINISHED()
         end
         
         self:Print("Misión registrada y entregada: " .. title)
-        if xpGained > 0 then
-            self:Print("Experiencia ganada: " .. xpGained .. " XP")
-        else
-            self:Print("No se pudo calcular la ganancia de XP para esta misión.")
-        end
     end
     
     -- Limpiar variables
@@ -261,7 +318,6 @@ function QuestLog:QUEST_LOG_UPDATE()
         local title, _, _, isHeader, _, isComplete = GetQuestLogTitle(i)
         if not isHeader and title then
             newQuestLog[title] = true
-            -- Guardar el estado actual de la misión (0 = en progreso, 1 = objetivos completados)
             currentQuestStates[title] = isComplete
             
             -- Si no tenemos un cache previo para esta misión, inicializar

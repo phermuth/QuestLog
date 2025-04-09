@@ -160,19 +160,24 @@ end
 
 -- En el método OnEnable, asegurarse de inicializar las variables de XP
 function QuestLog:OnEnable()
-    -- Código original de OnEnable
+    -- Asegúrate de que todos estos eventos estén registrados
     self:RegisterEvent("QUEST_ACCEPTED")
     self:RegisterEvent("QUEST_COMPLETE")
     self:RegisterEvent("QUEST_FINISHED")
     self:RegisterEvent("QUEST_LOG_UPDATE")
     
-    -- Hooks originales
+    -- Hooks necesarios
     self:Hook("AcceptQuest", true)
     self:Hook("CompleteQuest", true)
     
     -- Inicializar seguimiento de XP
     self.lastQuestXP = UnitXP("player")
     self.lastPlayerLevel = UnitLevel("player")
+    
+    -- Inicializar el cache de estado de misiones si no existe
+    if not self.questStateCache then
+        self.questStateCache = {}
+    end
     
     -- Mensaje de inicialización
     self:Print("QuestLog cargado. Usa /qlog para mostrar la bitácora de misiones.")
